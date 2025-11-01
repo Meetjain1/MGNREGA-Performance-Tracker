@@ -16,18 +16,20 @@ export default async function handler(
   try {
     const { search } = req.query;
 
-    const whereClause = search && typeof search === 'string'
-      ? {
-          OR: [
-            { name: { contains: search } },
-            { nameHindi: { contains: search } },
-            { code: { contains: search } },
-          ],
-        }
-      : undefined;
+    let whereClause: any = {};
+    
+    if (search && typeof search === 'string') {
+      whereClause = {
+        OR: [
+          { name: { contains: search } },
+          { nameHindi: { contains: search } },
+          { code: { contains: search } },
+        ],
+      };
+    }
 
     const districts = await prisma.district.findMany({
-      where: whereClause as any,
+      where: whereClause,
       select: {
         id: true,
         code: true,
@@ -43,6 +45,8 @@ export default async function handler(
         name: 'asc',
       },
     });
+
+    console.log(`Found ${districts.length} districts`); // Debug log
 
     const formattedDistricts = districts.map((d: any) => ({
       ...d,
