@@ -34,26 +34,68 @@ async function fetchFromDataGovAPI(
   const apiKey = process.env.MGNREGA_API_KEY || '';
   const baseUrl = process.env.MGNREGA_API_BASE_URL || 'https://api.data.gov.in/resource/ee83643a-ee4c-48c2-ac30-9f2ff26ab722';
   
-  // Using the correct data.gov.in MGNREGA API
+  // Build URL with parameters
   const url = new URL(baseUrl);
   url.searchParams.append('api-key', apiKey);
   url.searchParams.append('format', 'json');
-  url.searchParams.append('filters[district_code]', districtCode);
-  url.searchParams.append('filters[financial_year]', financialYear);
-  url.searchParams.append('filters[month]', month.toString());
+  url.searchParams.append('limit', '10');
+  
+  // Try both approaches - with filters and without
+  const urlWithFilters = new URL(url);
+  urlWithFilters.searchParams.append('filters[district_code]', districtCode);
+  urlWithFilters.searchParams.append('filters[financial_year]', financialYear);
+  urlWithFilters.searchParams.append('filters[month]', month.toString());
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      'Accept': 'application/json',
-    },
-    signal: AbortSignal.timeout(15000), // 15 second timeout
-  });
+  console.log('Trying API URL:', urlWithFilters.toString());
 
-  if (!response.ok) {
-    throw new Error(`API returned ${response.status}: ${response.statusText}`);
+  try {
+    // First try with filters
+    const response = await fetch(urlWithFilters.toString(), {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'MGNREGA-Performance-Tracker/1.0',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    });
+
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('API Response:', JSON.stringify(data, null, 2));
+
+    // Check if we got actual data or error response
+    if (data.status === 'error' || data.message === 'Meta not found' || !data.records || data.records.length === 0) {
+      console.log('API returned error or no data:', data.message || 'No records found');
+      
+      // Try without filters to see if we can get any data
+      console.log('Trying API without filters:', url.toString());
+      const fallbackResponse = await fetch(url.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'MGNREGA-Performance-Tracker/1.0',
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json();
+        console.log('Fallback API Response:', JSON.stringify(fallbackData, null, 2));
+        
+        if (fallbackData.records && fallbackData.records.length > 0) {
+          return fallbackData;
+        }
+      }
+      
+      throw new Error(`API not accessible: ${data.message || 'No data available'}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('API fetch failed:', error);
+    throw error;
   }
-
-  return await response.json();
 }
 
 function parseAPIResponse(apiData: any): Partial<CachedData> {
@@ -216,14 +258,16 @@ export default async function handler(
     }
 
     // Try to fetch from data.gov.in API
-    console.log('Attempting to fetch from data.gov.in API...');
+    console.log('Attempting to fetch from data.gov.in API for district:', districtId);
     try {
       // We need district code for API, use fallback mapping if database unavailable
-      const districtCode = district?.code || 'FALLBACK001';
+      const districtCode = district?.code || `DIST_${districtId}`;
+      console.log('Using district code for API:', districtCode);
+      
       const apiData = await fetchFromDataGovAPI(districtCode, financialYear, month);
       
       if (apiData && apiData.records && apiData.records.length > 0) {
-        console.log('Successfully fetched from API');
+        console.log('✅ Successfully fetched from API, records count:', apiData.records.length);
         const parsedData = parseAPIResponse(apiData);
 
         // If we have database access, update cache
@@ -251,7 +295,7 @@ export default async function handler(
               },
             });
 
-            console.log('Successfully fetched from API');
+            console.log('✅ API data cached successfully');
             
             return res.status(200).json({
               success: true,
@@ -260,21 +304,23 @@ export default async function handler(
               cachedAt: updated.fetchedAt.toISOString(),
             });
           } catch (updateError) {
-            console.log('Failed to cache API data, but returning API response');
+            console.log('⚠️ Failed to cache API data, but returning API response:', updateError);
           }
         }
 
         // Return API data without caching if database unavailable
-        console.log('Returning API data without caching');
+        console.log('✅ Returning API data without caching');
         return res.status(200).json({
           success: true,
           data: serializeCachedData(parsedData),
           source: 'api',
           cachedAt: new Date().toISOString(),
         } as any);
+      } else {
+        console.log('❌ API returned no records');
       }
     } catch (apiError) {
-      console.error('API fetch failed:', apiError);
+      console.error('❌ API fetch failed:', apiError instanceof Error ? apiError.message : apiError);
 
     }
 
