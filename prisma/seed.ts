@@ -2,6 +2,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+console.log('🌱 Starting database seeding...');
+console.log('Database URL:', process.env.DATABASE_URL?.substring(0, 30) + '...');
+
 // Bihar districts with coordinates
 const biharDistricts = [
   { code: 'BR001', name: 'Patna', nameHindi: 'पटना', stateCode: 'BR', stateName: 'Bihar', lat: 25.5941, lng: 85.1376, population: 5838465 },
@@ -221,9 +224,11 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('❌ Seeding failed:', e);
+    console.error('Error details:', e.message);
     process.exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();
+    console.log('📦 Database connection closed');
   });

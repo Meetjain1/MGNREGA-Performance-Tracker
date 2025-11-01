@@ -16,6 +16,8 @@ export default async function handler(
   try {
     const { search } = req.query;
 
+    console.log('Districts API called, DATABASE_URL:', process.env.DATABASE_URL?.substring(0, 20) + '...');
+
     let whereClause: any = {};
     
     if (search && typeof search === 'string') {
@@ -62,7 +64,7 @@ export default async function handler(
     console.error('Error fetching districts:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to fetch districts',
+      error: 'Failed to fetch districts: ' + (error as Error).message,
     });
   }
 }

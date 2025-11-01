@@ -101,9 +101,10 @@ export default async function handler(
     } as any);
   } catch (error) {
     console.error('Error detecting district:', error);
+    console.error('Database URL:', process.env.DATABASE_URL?.substring(0, 20) + '...');
     return res.status(500).json({
       success: false,
-      error: 'Internal server error',
+      error: 'Internal server error: ' + (error as Error).message,
     });
   }
 }
