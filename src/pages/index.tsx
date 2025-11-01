@@ -57,19 +57,19 @@ export default function Home() {
       <main className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
         {/* Header */}
         <header className="bg-primary-600 text-white shadow-lg">
-          <div className="container mx-auto px-4 py-6">
-            <h1 className="text-3xl md:text-5xl font-bold text-center">
-              <span className="block text-4xl md:text-6xl mb-2">हमारी आवाज़, हमारे अधिकार</span>
+          <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-center">
+              <span className="block text-3xl sm:text-4xl md:text-6xl mb-1 sm:mb-2">हमारी आवाज़, हमारे अधिकार</span>
               Our Voice, Our Rights
             </h1>
-            <p className="text-center mt-4 text-lg md:text-xl">
+            <p className="text-center mt-2 sm:mt-4 text-base sm:text-lg md:text-xl">
               <span className="block">मनरेगा प्रदर्शन ट्रैकर</span>
               MGNREGA Performance Tracker
             </p>
           </div>
         </header>
 
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-7xl">
           {/* Introduction */}
           <section className="card mb-8 bg-blue-50 border-2 border-blue-200">
             <div className="flex items-start gap-4">
@@ -161,7 +161,7 @@ export default function Home() {
                   Key Metrics
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   <MetricCard
                     title="Job Cards Issued"
                     titleHindi="जारी जॉब कार्ड"
@@ -237,7 +237,7 @@ export default function Home() {
                   Financial Data
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   <MetricCard
                     title="Total Expenditure"
                     titleHindi="कुल व्यय"

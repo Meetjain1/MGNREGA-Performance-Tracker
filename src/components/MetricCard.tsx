@@ -22,24 +22,24 @@ export default function MetricCard({
   tooltip,
 }: MetricCardProps) {
   return (
-    <div className="metric-card group relative" title={tooltip}>
-      <div className={`${colorClass} text-white rounded-full p-4 icon-large flex items-center justify-center text-4xl mb-4`}>
+    <div className="metric-card group relative w-full" title={tooltip}>
+      <div className={`${colorClass} text-white rounded-full p-3 sm:p-4 w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center text-2xl sm:text-4xl mb-3 sm:mb-4 mx-auto`}>
         {icon}
       </div>
       
-      <div className="text-center">
-        <h3 className="text-xl font-semibold text-gray-700 mb-1">
-          {titleHindi && <span className="block text-2xl mb-1">{titleHindi}</span>}
+      <div className="text-center px-2">
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-1">
+          {titleHindi && <span className="block text-xl sm:text-2xl mb-1">{titleHindi}</span>}
           {title}
         </h3>
         
-        <div className="text-4xl font-bold text-gray-900 my-3">
+        <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 my-2 sm:my-3 break-words">
           {value}
         </div>
         
         {(description || descriptionHindi) && (
-          <p className="text-sm text-gray-600 mt-2">
-            {descriptionHindi && <span className="block text-base mb-1">{descriptionHindi}</span>}
+          <p className="text-xs sm:text-sm text-gray-600 mt-2">
+            {descriptionHindi && <span className="block text-sm sm:text-base mb-1">{descriptionHindi}</span>}
             {description}
           </p>
         )}
