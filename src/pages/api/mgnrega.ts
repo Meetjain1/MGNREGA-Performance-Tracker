@@ -348,20 +348,38 @@ export default async function handler(
 }
 
 function serializeCachedData(data: any): CachedData {
+  // Recursively convert BigInt -> string and Date -> ISO to make the object JSON serializable
+  function sanitize(value: any): any {
+    if (typeof value === 'bigint') return value.toString();
+    if (value instanceof Date) return value.toISOString();
+    if (Array.isArray(value)) return value.map(sanitize);
+    if (value && typeof value === 'object') {
+      const out: any = {};
+      for (const [k, v] of Object.entries(value)) {
+        out[k] = sanitize(v);
+      }
+      return out;
+    }
+    return value;
+  }
+
+  const safe = sanitize(data);
+
+  // Ensure known BigInt metric fields are strings (backwards compatibility)
   return {
-    ...data,
-    jobCardsIssued: data.jobCardsIssued?.toString(),
-    activeJobCards: data.activeJobCards?.toString(),
-    activeWorkers: data.activeWorkers?.toString(),
-    householdsWorked: data.householdsWorked?.toString(),
-    personDaysGenerated: data.personDaysGenerated?.toString(),
-    womenPersonDays: data.womenPersonDays?.toString(),
-    scPersonDays: data.scPersonDays?.toString(),
-    stPersonDays: data.stPersonDays?.toString(),
-    totalWorksStarted: data.totalWorksStarted?.toString(),
-    totalWorksCompleted: data.totalWorksCompleted?.toString(),
-    totalWorksInProgress: data.totalWorksInProgress?.toString(),
-  };
+    ...safe,
+    jobCardsIssued: safe.jobCardsIssued ?? undefined,
+    activeJobCards: safe.activeJobCards ?? undefined,
+    activeWorkers: safe.activeWorkers ?? undefined,
+    householdsWorked: safe.householdsWorked ?? undefined,
+    personDaysGenerated: safe.personDaysGenerated ?? undefined,
+    womenPersonDays: safe.womenPersonDays ?? undefined,
+    scPersonDays: safe.scPersonDays ?? undefined,
+    stPersonDays: safe.stPersonDays ?? undefined,
+    totalWorksStarted: safe.totalWorksStarted ?? undefined,
+    totalWorksCompleted: safe.totalWorksCompleted ?? undefined,
+    totalWorksInProgress: safe.totalWorksInProgress ?? undefined,
+  } as CachedData;
 }
 
 async function logAPIRequest(
