@@ -32,13 +32,10 @@ async function fetchFromDataGovAPI(
   month: number
 ): Promise<any> {
   const apiKey = process.env.MGNREGA_API_KEY || '';
-  const baseUrl = process.env.MGNREGA_API_BASE_URL || 'https://api.data.gov.in/resource';
+  const baseUrl = process.env.MGNREGA_API_BASE_URL || 'https://api.data.gov.in/resource/ee83643a-ee4c-48c2-ac30-9f2ff26ab722';
   
-  // Note: The actual resource ID and parameters need to be updated based on data.gov.in documentation
-  // This is a placeholder implementation
-  const resourceId = '6e4f1cc5-a6a9-4d61-a04e-2d8c1f8e6f8d'; // Replace with actual resource ID
-  
-  const url = new URL(`${baseUrl}/${resourceId}`);
+  // Using the correct data.gov.in MGNREGA API
+  const url = new URL(baseUrl);
   url.searchParams.append('api-key', apiKey);
   url.searchParams.append('format', 'json');
   url.searchParams.append('filters[district_code]', districtCode);
@@ -60,27 +57,40 @@ async function fetchFromDataGovAPI(
 }
 
 function parseAPIResponse(apiData: any): Partial<CachedData> {
-  // This function needs to be updated based on actual API response structure
-  // Currently using a generic parser
+  // Parse actual data.gov.in API response structure
+  // API returns records array with actual MGNREGA field names
   
   const record = apiData.records?.[0] || apiData;
   
+  // Helper function to safely parse numbers
+  const parseNumber = (val: any) => {
+    if (val === null || val === undefined || val === '' || val === 'NA') return undefined;
+    const num = typeof val === 'string' ? parseFloat(val.replace(/,/g, '')) : val;
+    return isNaN(num) ? undefined : num;
+  };
+  
+  const parseBigInt = (val: any) => {
+    const num = parseNumber(val);
+    return num !== undefined ? BigInt(Math.floor(num)) : undefined;
+  };
+  
   return {
-    jobCardsIssued: record.total_job_cards_issued ? BigInt(record.total_job_cards_issued) : undefined,
-    activeJobCards: record.active_job_cards ? BigInt(record.active_job_cards) : undefined,
-    activeWorkers: record.active_workers ? BigInt(record.active_workers) : undefined,
-    householdsWorked: record.households_worked ? BigInt(record.households_worked) : undefined,
-    personDaysGenerated: record.person_days_generated ? BigInt(record.person_days_generated) : undefined,
-    womenPersonDays: record.women_person_days ? BigInt(record.women_person_days) : undefined,
-    scPersonDays: record.sc_person_days ? BigInt(record.sc_person_days) : undefined,
-    stPersonDays: record.st_person_days ? BigInt(record.st_person_days) : undefined,
-    totalWorksStarted: record.total_works_started ? BigInt(record.total_works_started) : undefined,
-    totalWorksCompleted: record.total_works_completed ? BigInt(record.total_works_completed) : undefined,
-    totalWorksInProgress: record.total_works_in_progress ? BigInt(record.total_works_in_progress) : undefined,
-    totalExpenditure: record.total_expenditure ? parseFloat(record.total_expenditure) : undefined,
-    wageExpenditure: record.wage_expenditure ? parseFloat(record.wage_expenditure) : undefined,
-    materialExpenditure: record.material_expenditure ? parseFloat(record.material_expenditure) : undefined,
-    averageDaysForPayment: record.avg_days_for_payment ? parseFloat(record.avg_days_for_payment) : undefined,
+    // Map API fields to database fields based on actual data.gov.in response
+    jobCardsIssued: parseBigInt(record['Total_No_of_JobCards_issued'] || record.total_no_of_jobcards_issued),
+    activeJobCards: parseBigInt(record['Total_No_of_Active_Job_Cards'] || record.total_no_of_active_job_cards),
+    activeWorkers: parseBigInt(record['Total_No_of_Active_Workers'] || record.total_no_of_active_workers),
+    householdsWorked: parseBigInt(record['Total_Households_Worked'] || record.total_households_worked),
+    personDaysGenerated: parseBigInt(record['Women_Persondays'] || record.women_persondays), // Using as total for now
+    womenPersonDays: parseBigInt(record['Women_Persondays'] || record.women_persondays),
+    scPersonDays: parseBigInt(record['SC_Persondays'] || record.sc_persondays),
+    stPersonDays: parseBigInt(record['ST_Persondays'] || record.st_persondays),
+    totalWorksStarted: parseBigInt(record['Total_No_of_Works_Takenup'] || record.total_no_of_works_takenup),
+    totalWorksCompleted: parseBigInt(record['Total_No_of_Works_Completed'] || record.total_no_of_works_completed),
+    totalWorksInProgress: parseBigInt(record['Total_No_of_Works_Ongoing'] || record.total_no_of_works_ongoing),
+    totalExpenditure: parseNumber(record['Total_Adm_Expenditure'] || record.total_adm_expenditure),
+    wageExpenditure: parseNumber(record['Wages'] || record.wages),
+    materialExpenditure: parseNumber(record['Material_and_skilled_Wages'] || record.material_and_skilled_wages),
+    averageDaysForPayment: parseNumber(record['Average_days_for_Wage_Payment'] || record.average_days_for_wage_payment),
     rawData: JSON.stringify(apiData),
   };
 }
