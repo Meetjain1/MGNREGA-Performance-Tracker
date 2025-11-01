@@ -15,7 +15,7 @@ try {
 } catch (err) {
   // If Prisma fails to initialize (missing/invalid DATABASE_URL in production),
   // export a safe proxy that returns rejected promises so callers can handle DB absence.
-  console.error('Prisma initialization failed:', err?.message || err);
+  console.error('Prisma initialization failed:', err instanceof Error ? err.message : err);
 
   const handler: ProxyHandler<any> = {
     get(_target, prop) {
