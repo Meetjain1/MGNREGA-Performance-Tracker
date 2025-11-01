@@ -201,7 +201,7 @@ export default async function handler(
 
         // Return fresh cache if available
         if (cachedData && cachedData.fetchedAt > cacheThreshold && !cachedData.isStale) {
-          await logAPIRequest(req, 200, Date.now() - startTime);
+          console.log('Returning fresh cache');
           
           return res.status(200).json({
             success: true,
@@ -251,8 +251,8 @@ export default async function handler(
               },
             });
 
-            await logAPIRequest(req, 200, Date.now() - startTime);
-
+            console.log('Successfully fetched from API');
+            
             return res.status(200).json({
               success: true,
               data: serializeCachedData(updated),
@@ -265,7 +265,7 @@ export default async function handler(
         }
 
         // Return API data without caching if database unavailable
-        await logAPIRequest(req, 200, Date.now() - startTime);
+        console.log('Returning API data without caching');
         return res.status(200).json({
           success: true,
           data: serializeCachedData(parsedData),
@@ -283,7 +283,7 @@ export default async function handler(
     
     // Try stale cache first if we have database access
     if (cachedData) {
-      await logAPIRequest(req, 200, Date.now() - startTime, 'Using stale cache');
+      console.log('Using stale cache data');
 
       // Mark as stale if we have database access
       if (district) {
@@ -306,8 +306,8 @@ export default async function handler(
     }
 
     // Generate district-specific fallback data
+    console.log('Generating fallback data for district:', districtId);
     const fallbackData = generateFallbackData(districtId, financialYear, month);
-    await logAPIRequest(req, 200, Date.now() - startTime, 'Using generated fallback');
 
     return res.status(200).json({
       success: true,
@@ -323,12 +323,12 @@ export default async function handler(
     
     // Last resort fallback for any error
     try {
+      console.log('Using emergency fallback');
       const fallbackData = generateFallbackData(
         (errorDistrictId as string) || 'fallback-district', 
         getFinancialYear(), 
         new Date().getMonth() + 1
       );
-      await logAPIRequest(req, 200, Date.now() - startTime, 'Using emergency fallback');
       
       return res.status(200).json({
         success: true,
@@ -337,7 +337,7 @@ export default async function handler(
         cachedAt: fallbackData.fetchedAt.toISOString(),
       } as any);
     } catch (fallbackError) {
-      await logAPIRequest(req, 500, Date.now() - startTime, String(error));
+      console.error('Emergency fallback failed:', fallbackError);
       
       return res.status(500).json({
         success: false,
@@ -381,6 +381,7 @@ async function logAPIRequest(
       },
     });
   } catch (err) {
-    console.error('Failed to log API request:', err);
+    // Silently fail if database is not available - don't let logging break the app
+    console.log('Logging disabled - database not available');
   }
 }
