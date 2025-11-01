@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* High contrast and readable styles for low-literacy users */
+@layer base {
+  body {
+    @apply text-gray-900 bg-gray-50;
+    font-size: 18px;
+    line-height: 1.6;
+  }
+  
+  h1 {
+    @apply text-4xl font-bold mb-4;
+  }
+  
+  h2 {
+    @apply text-3xl font-semibold mb-3;
+  }
+  
+  h3 {
+    @apply text-2xl font-medium mb-2;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 py-4 bg-primary-600 text-white rounded-lg font-semibold text-xl hover:bg-primary-700 transition-colors shadow-lg;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-4 bg-white text-primary-600 border-2 border-primary-600 rounded-lg font-semibold text-xl hover:bg-primary-50 transition-colors;
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-lg p-6 border border-gray-200;
+  }
+  
+  .metric-card {
+    @apply card flex flex-col items-center text-center p-8 hover:shadow-xl transition-shadow;
+  }
+  
+  .icon-large {
+    @apply w-16 h-16 mb-4;
+  }
+}

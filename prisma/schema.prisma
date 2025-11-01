@@ -1,0 +1,110 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// District master data with geolocation
+model District {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  nameHindi   String?
+  stateCode   String
+  stateName   String
+  latitude    Float
+  longitude   Float
+  population  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  cachedData  CachedMGNREGAData[]
+  
+  @@index([stateCode])
+  @@index([latitude, longitude])
+  @@map("districts")
+}
+
+// Cached API responses from data.gov.in
+model CachedMGNREGAData {
+  id            String   @id @default(cuid())
+  districtId    String
+  district      District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  
+  // Time period
+  financialYear String
+  month         Int
+  
+  // MGNREGA Performance Metrics
+  jobCardsIssued              BigInt?
+  activeJobCards              BigInt?
+  activeWorkers               BigInt?
+  
+  // Employment Data
+  householdsWorked            BigInt?
+  personDaysGenerated         BigInt?
+  womenPersonDays             BigInt?
+  scPersonDays                BigInt?
+  stPersonDays                BigInt?
+  
+  // Work Completion
+  totalWorksStarted           BigInt?
+  totalWorksCompleted         BigInt?
+  totalWorksInProgress        BigInt?
+  
+  // Financial Data (in lakhs)
+  totalExpenditure            Float?
+  wageExpenditure             Float?
+  materialExpenditure         Float?
+  
+  // Payment Performance
+  averageDaysForPayment       Float?
+  
+  // Raw API response (for debugging)
+  rawData       String?
+  
+  // Metadata
+  fetchedAt     DateTime @default(now())
+  isStale       Boolean  @default(false)
+  
+  @@unique([districtId, financialYear, month])
+  @@index([districtId, financialYear])
+  @@index([fetchedAt])
+  @@map("cached_mgnrega_data")
+}
+
+// API request logs for monitoring
+model APIRequestLog {
+  id            String   @id @default(cuid())
+  endpoint      String
+  method        String
+  statusCode    Int?
+  responseTime  Int?     // in milliseconds
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+  
+  @@index([createdAt])
+  @@index([endpoint, statusCode])
+  @@map("api_request_logs")
+}
+
+// User activity tracking (optional, for analytics)
+model UserActivity {
+  id            String   @id @default(cuid())
+  sessionId     String?
+  districtId    String?
+  action        String   // 'view', 'search', 'compare', etc.
+  metadata      String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+  
+  @@index([createdAt])
+  @@index([districtId])
+  @@map("user_activities")
+}
