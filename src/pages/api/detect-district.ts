@@ -67,25 +67,25 @@ export default async function handler(
     });
   }
 
+  const { latitude, longitude } = req.body;
+
+  // Validate coordinates
+  if (
+    typeof latitude !== 'number' ||
+    typeof longitude !== 'number' ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid coordinates',
+    });
+  }
+
   try {
-    const { latitude, longitude } = req.body;
-
-    // Validate coordinates
-    if (
-      typeof latitude !== 'number' ||
-      typeof longitude !== 'number' ||
-      latitude < -90 ||
-      latitude > 90 ||
-      longitude < -180 ||
-      longitude > 180
-    ) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid coordinates',
-      });
-    }
-
-    // Get all districts from database
+    // Try to get districts from database
     const allDistricts = await prisma.district.findMany({
       select: {
         id: true,
@@ -99,10 +99,7 @@ export default async function handler(
     });
 
     if (allDistricts.length === 0) {
-      return res.status(500).json({
-        success: false,
-        error: 'No districts found in database',
-      });
+      throw new Error('No districts in database');
     }
 
     // Find nearest district
@@ -148,40 +145,34 @@ export default async function handler(
     });
 
   } catch (error) {
-    console.error('Error in detect-district:', error);
+    console.error('Database query failed, using fallback:', error);
+  }
 
-    // Fallback to nearest major city if database query fails
-    const { latitude, longitude } = req.body || {};
-    
-    if (typeof latitude === 'number' && typeof longitude === 'number') {
-      try {
-        const nearest = findNearestFallbackDistrict(latitude, longitude, fallbackDistricts);
-        const locationName = await getLocationName(latitude, longitude);
+  // Use fallback if database fails or is unavailable
+  try {
+    const nearest = findNearestFallbackDistrict(latitude, longitude, fallbackDistricts);
+    const locationName = await getLocationName(latitude, longitude);
 
-        // Create a fallback district data structure
-        const fallbackDistrictData: DistrictData = {
-          id: 'fallback',
-          code: 'FALLBACK',
-          name: nearest.name,
-          stateCode: 'FB',
-          stateName: nearest.stateName,
-          latitude: nearest.latitude,
-          longitude: nearest.longitude,
-        };
+    const fallbackDistrictData: DistrictData = {
+      id: 'fallback',
+      code: 'FALLBACK',
+      name: nearest.name,
+      stateCode: 'FB',
+      stateName: nearest.stateName,
+      latitude: nearest.latitude,
+      longitude: nearest.longitude,
+    };
 
-        return res.status(200).json({
-          success: true,
-          data: {
-            district: fallbackDistrictData,
-            distance: nearest.distance,
-          },
-          source: 'fallback',
-        });
-      } catch (fallbackError) {
-        console.error('Fallback location detection failed:', fallbackError);
-      }
-    }
-
+    return res.status(200).json({
+      success: true,
+      data: {
+        district: fallbackDistrictData,
+        distance: nearest.distance,
+      },
+      source: 'fallback',
+    });
+  } catch (fallbackError) {
+    console.error('Fallback location detection failed:', fallbackError);
     return res.status(500).json({
       success: false,
       error: 'Failed to detect location',
