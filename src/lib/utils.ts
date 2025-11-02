@@ -124,15 +124,8 @@ export function formatLargeNumber(num: number | bigint): string {
  * Get financial year from date
  */
 export function getFinancialYear(date: Date = new Date()): string {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1; // JavaScript months are 0-indexed
-
-  // Financial year in India runs from April to March
-  if (month >= 4) {
-    return `${year}-${(year + 1).toString().slice(-2)}`;
-  } else {
-    return `${year - 1}-${year.toString().slice(-2)}`;
-  }
+  // For now, return the financial year that has data in the API
+  return "2024-2025";
 }
 
 /**

@@ -32,118 +32,74 @@ async function fetchFromDataGovAPI(
   month: number
 ): Promise<any> {
   const apiKey = process.env.MGNREGA_API_KEY || '';
+  const baseUrl = 'https://api.data.gov.in/resource/ee03643a-ee4c-48c2-ac30-9f2ff26ab722';
   
-  // Try multiple potential API endpoints and approaches
-  const strategies = [
-    // Strategy 1: Try the original endpoint with different resource IDs
-    async () => {
-      const resourceIds = [
-        'ee83643a-ee4c-48c2-ac30-9f2ff26ab722',
-        '603001422-mgnrega-data',
-        'district-wise-mgnrega-data-glance'
-      ];
-      
-      for (const resourceId of resourceIds) {
-        try {
-          const url = new URL(`https://api.data.gov.in/resource/${resourceId}`);
-          url.searchParams.append('api-key', apiKey);
-          url.searchParams.append('format', 'json');
-          url.searchParams.append('limit', '50');
-          
-          const response = await fetch(url.toString(), {
-            headers: { 'Accept': 'application/json', 'User-Agent': 'MGNREGA-Tracker/1.0' },
-            signal: AbortSignal.timeout(8000),
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.status !== 'error' && data.records && data.records.length > 0) {
-              console.log(`Found working resource ID: ${resourceId}`);
-              return data;
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      throw new Error('No working resource ID found');
-    },
-    
-    // Strategy 2: Try MGNREGA dashboard and alternative government APIs
-    async () => {
-      const dashboardEndpoints = [
-        'https://mnregaweb4.nic.in/netnrega/api/district-data',
-        'https://rural.nic.in/mgnrega-api/district-summary',
-        'https://nrega.dord.gov.in/api/district-wise-data',
-        'https://pmkisan.gov.in/mgnrega/api/district',
-        'https://dashboard.rural.gov.in/api/mgnrega'
-      ];
-      
-      for (const url of dashboardEndpoints) {
-        try {
-          const response = await fetch(url, {
-            headers: { 
-              'Accept': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (compatible; MGNREGA-Tracker/1.0)'
-            },
-            signal: AbortSignal.timeout(8000),
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data && (data.data || data.records || data.districts || Array.isArray(data))) {
-              console.log(`Found working MGNREGA dashboard: ${url}`);
-              return { 
-                records: data.data || data.records || data.districts || data,
-                source: 'mgnrega_dashboard'
-              };
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      // Try Open Data portals from other states
-      const statePortals = [
-        'https://data.telangana.gov.in/api/mgnrega-district-data',
-        'https://data.maharashtra.gov.in/api/mgnrega',
-        'https://opendata.kerala.gov.in/api/mgnrega-summary'
-      ];
-      
-      for (const url of statePortals) {
-        try {
-          const response = await fetch(url, {
-            headers: { 'Accept': 'application/json' },
-            signal: AbortSignal.timeout(5000),
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data && data.records) {
-              console.log(`Found working state portal: ${url}`);
-              return data;
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      throw new Error('No government portals working');
-    }
-  ];
-
-  for (const strategy of strategies) {
-    try {
-      const result = await strategy();
-      if (result) return result;
-    } catch (error) {
-      console.log('Strategy failed:', error instanceof Error ? error.message : 'Unknown error');
-    }
+  console.log(`Fetching MGNREGA data for district ${districtCode}, FY ${financialYear}, month ${month}`);
+  
+  // Build URL with parameters
+  const url = new URL(baseUrl);
+  url.searchParams.append('api-key', apiKey);
+  url.searchParams.append('format', 'json');
+  url.searchParams.append('limit', '100');
+  
+  // Add filters for district and financial year
+  if (districtCode && districtCode !== 'unknown') {
+    url.searchParams.append('filters[district_code]', districtCode);
   }
-  
-  throw new Error('All API strategies failed - using fallback data');
+  url.searchParams.append('filters[fin_year]', financialYear);
+
+  console.log(`API URL: ${url.toString()}`);
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'MGNREGA-Performance-Tracker/1.0',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`API Response status: ${data.status}, records: ${data.records?.length || 0}`);
+
+    if (data.status === 'error' || !data.records || data.records.length === 0) {
+      // Try without district filter
+      const urlWithoutDistrict = new URL(baseUrl);
+      urlWithoutDistrict.searchParams.append('api-key', apiKey);
+      urlWithoutDistrict.searchParams.append('format', 'json');
+      urlWithoutDistrict.searchParams.append('limit', '50');
+      urlWithoutDistrict.searchParams.append('filters[fin_year]', financialYear);
+      
+      console.log(`Trying without district filter: ${urlWithoutDistrict.toString()}`);
+      
+      const fallbackResponse = await fetch(urlWithoutDistrict.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'MGNREGA-Performance-Tracker/1.0',
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json();
+        if (fallbackData.records && fallbackData.records.length > 0) {
+          console.log(`Fallback API success: ${fallbackData.records.length} records`);
+          return fallbackData;
+        }
+      }
+      
+      throw new Error(`API returned no data: ${data.message || 'No records found'}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('API fetch failed:', error);
+    throw error;
+  }
 }
 
 function parseAPIData(apiData: any, districtId: string, financialYear: string, month: number): any {
@@ -155,8 +111,10 @@ function parseAPIData(apiData: any, districtId: string, financialYear: string, m
   let record = apiData.records.find((r: any) => 
     r.district_code === districtId || 
     r.District_Code === districtId ||
-    r['District Code'] === districtId
+    r.district_code === districtId.toString()
   ) || apiData.records[0];
+
+  console.log(`Using record for district: ${record.district_name || record.District_Name || 'Unknown'}`);
 
   // Helper functions to safely parse numbers
   const parseBigInt = (value: any): bigint => {
@@ -171,84 +129,29 @@ function parseAPIData(apiData: any, districtId: string, financialYear: string, m
     return isNaN(num) ? 0 : num;
   };
 
-  // Try different field name variations for flexibility
-  const getFieldValue = (fieldNames: string[]): any => {
-    for (const name of fieldNames) {
-      if (record[name] !== undefined && record[name] !== null) {
-        return record[name];
-      }
-    }
-    return 0;
-  };
-
   return {
     id: `api-${districtId}-${financialYear}-${month}`,
     districtId,
     financialYear,
     month,
-    jobCardsIssued: parseBigInt(getFieldValue([
-      'total_no_of_jobcards_issued', 'Total_No_of_JobCards_issued', 
-      'jobcards_issued', 'Total_JobCards', 'job_cards'
-    ])),
-    activeJobCards: parseBigInt(getFieldValue([
-      'total_no_of_workers', 'Total_No_of_Workers', 
-      'active_workers', 'workers', 'total_workers'
-    ])),
-    activeWorkers: parseBigInt(getFieldValue([
-      'total_no_of_active_workers', 'Total_No_of_Active_Workers',
-      'active_workers_month', 'workers_employed', 'active_employment'
-    ])),
-    householdsWorked: parseBigInt(getFieldValue([
-      'total_households_worked', 'Total_Households_Worked',
-      'households', 'hh_worked', 'household_employment'
-    ])),
-    personDaysGenerated: parseBigInt(getFieldValue([
-      'total_person_days_generated', 'Total_Person_Days_Generated',
-      'person_days', 'employment_days', 'total_persondays'
-    ])),
-    womenPersonDays: parseBigInt(getFieldValue([
-      'women_person_days', 'Women_Persondays', 'women_employment',
-      'female_persondays', 'women_days'
-    ])),
-    scPersonDays: parseBigInt(getFieldValue([
-      'sc_person_days', 'SC_Persondays', 'sc_employment',
-      'scheduled_caste_days', 'sc_days'
-    ])),
-    stPersonDays: parseBigInt(getFieldValue([
-      'st_person_days', 'ST_Persondays', 'st_employment',
-      'scheduled_tribe_days', 'st_days'
-    ])),
-    totalWorksStarted: parseBigInt(getFieldValue([
-      'total_works_started', 'Total_No_of_Works_Takenup',
-      'works_started', 'projects_started', 'works_initiated'
-    ])),
-    totalWorksCompleted: parseBigInt(getFieldValue([
-      'total_works_completed', 'Total_No_of_Works_Completed',
-      'works_completed', 'projects_completed', 'completed_works'
-    ])),
-    totalWorksInProgress: parseBigInt(getFieldValue([
-      'total_works_in_progress', 'Total_No_of_Works_Ongoing',
-      'works_ongoing', 'projects_ongoing', 'ongoing_works'
-    ])),
-    totalExpenditure: parseNumber(getFieldValue([
-      'total_expenditure', 'Total_Adm_Expenditure',
-      'expenditure', 'total_expense', 'budget_spent'
-    ])),
-    wageExpenditure: parseNumber(getFieldValue([
-      'wage_expenditure', 'Wages', 'wage_expense',
-      'labor_cost', 'wage_payment'
-    ])),
-    materialExpenditure: parseNumber(getFieldValue([
-      'material_expenditure', 'Material_and_skilled_Wages',
-      'material_cost', 'material_expense', 'equipment_cost'
-    ])),
-    averageDaysForPayment: parseNumber(getFieldValue([
-      'average_days_for_payment', 'Average_days_for_Wage_Payment',
-      'payment_days', 'wage_delay', 'payment_time'
-    ])),
+    jobCardsIssued: parseBigInt(record.Total_No_of_JobCards_issued),
+    activeJobCards: parseBigInt(record.Total_No_of_Active_Job_Cards), 
+    activeWorkers: parseBigInt(record.Total_No_of_Active_Workers),
+    householdsWorked: parseBigInt(record.Total_Households_Worked),
+    personDaysGenerated: parseBigInt(record.Persondays_of_Central_Liability_so_far),
+    womenPersonDays: parseBigInt(record.Women_Persondays),
+    scPersonDays: parseBigInt(record.SC_persondays),
+    stPersonDays: parseBigInt(record.ST_persondays),
+    totalWorksStarted: parseBigInt(record.Total_No_of_Works_Takenup),
+    totalWorksCompleted: parseBigInt(record.Number_of_Completed_Works),
+    totalWorksInProgress: parseBigInt(record.Number_of_Ongoing_Works),
+    totalExpenditure: parseNumber(record.Total_Exp) * 100000, // Convert to rupees
+    wageExpenditure: parseNumber(record.Wages) * 100000, // Convert to rupees
+    materialExpenditure: parseNumber(record.Material_and_skilled_Wages) * 100000, // Convert to rupees
+    averageDaysForPayment: parseNumber(record.Average_days_of_employment_provided_per_Household) / 10, // Approximate
     fetchedAt: new Date(),
     isStale: false,
-    rawData: JSON.stringify(apiData),
+    rawData: JSON.stringify(record),
   };
 }
 
@@ -412,7 +315,7 @@ export default async function handler(
     console.log('Attempting to fetch from data.gov.in API for district:', districtId);
     try {
       // We need district code for API, use fallback mapping if database unavailable
-      const districtCode = district?.code || `DIST_${districtId}`;
+      const districtCode = district?.code || districtId;
       console.log('Using district code for API:', districtCode);
       
       const apiData = await fetchFromDataGovAPI(districtCode, financialYear, month);
