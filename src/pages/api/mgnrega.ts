@@ -56,7 +56,7 @@ async function fetchFromDataGovAPI(
         'Accept': 'application/json',
         'User-Agent': 'MGNREGA-Performance-Tracker/1.0',
       },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(30000), // Increased timeout to 30 seconds
     });
 
     if (!response.ok) {
@@ -107,14 +107,28 @@ function parseAPIData(apiData: any, districtId: string, financialYear: string, m
     throw new Error('No records in API response');
   }
 
-  // Find a record that matches our criteria or use the first record
+  console.log(`Looking for district ${districtId} in ${apiData.records.length} records`);
+  console.log('Available district codes in API:', apiData.records.map((r: any) => r.district_code || r.District_Code).filter(Boolean).slice(0, 10));
+
+  // Find a record that matches our criteria
   let record = apiData.records.find((r: any) => 
     r.district_code === districtId || 
     r.District_Code === districtId ||
     r.district_code === districtId.toString()
-  ) || apiData.records[0];
+  );
 
-  console.log(`Using record for district: ${record.district_name || record.District_Name || 'Unknown'}`);
+  // If no exact match found, throw error to use fallback instead of wrong data
+  if (!record) {
+    console.log(`No matching record found for district ${districtId} in API response`);
+    console.log('First few records district codes:', apiData.records.slice(0, 3).map((r: any) => ({ 
+      district_code: r.district_code, 
+      District_Code: r.District_Code,
+      district_name: r.district_name || r.District_Name 
+    })));
+    throw new Error(`No data found for district ${districtId}`);
+  }
+
+  console.log(`Using record for district: ${record.district_name || record.District_Name || 'Unknown'} (Code: ${record.district_code})`);
 
   // Helper functions to safely parse numbers
   const parseBigInt = (value: any): bigint => {
@@ -379,11 +393,11 @@ export default async function handler(
     }
 
     // Use fallback data (stale cache if available, otherwise generated)
-    console.log('Using fallback data for district:', districtId);
+    console.log('✅ Using fallback data for district:', districtId);
     
     // Try stale cache first if we have database access
     if (cachedData) {
-      console.log('Using stale cache data');
+      console.log('📋 Using stale cache data');
 
       // Mark as stale if we have database access
       if (district) {
@@ -406,8 +420,9 @@ export default async function handler(
     }
 
     // Generate district-specific fallback data
-    console.log('Generating fallback data for district:', districtId);
+    console.log('📊 Generating fallback data for district:', districtId);
     const fallbackData = generateFallbackData(districtId, financialYear, month);
+    console.log(`✨ Generated - Active Workers: ${fallbackData.activeWorkers}, District ID: ${districtId.slice(-6)}`);
 
     return res.status(200).json({
       success: true,

@@ -1,7 +1,62 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '@/lib/prisma';
-import { findNearestDistrict } from '@/lib/utils';
-import type { APIResponse, GeolocationResponse } from '@/types';
+import { PrismaClient } from '@prisma/client';
+import { calculateDistance } from '@/lib/utils';
+import type { APIResponse, GeolocationResponse, DistrictData } from '@/types';
+
+const prisma = new PrismaClient();
+
+// Major cities as fallback districts
+const fallbackDistricts: Array<{
+  name: string;
+  stateName: string;
+  latitude: number;
+  longitude: number;
+}> = [
+  { name: 'Mumbai', stateName: 'Maharashtra', latitude: 19.0760, longitude: 72.8777 },
+  { name: 'Delhi', stateName: 'Delhi', latitude: 28.6139, longitude: 77.2090 },
+  { name: 'Bengaluru', stateName: 'Karnataka', latitude: 12.9716, longitude: 77.5946 },
+  { name: 'Hyderabad', stateName: 'Telangana', latitude: 17.3850, longitude: 78.4867 },
+  { name: 'Chennai', stateName: 'Tamil Nadu', latitude: 13.0827, longitude: 80.2707 },
+  { name: 'Kolkata', stateName: 'West Bengal', latitude: 22.5726, longitude: 88.3639 },
+  { name: 'Pune', stateName: 'Maharashtra', latitude: 18.5204, longitude: 73.8567 },
+  { name: 'Ahmedabad', stateName: 'Gujarat', latitude: 23.0225, longitude: 72.5714 },
+];
+
+function findNearestFallbackDistrict(
+  userLat: number,
+  userLng: number,
+  fallbacks: typeof fallbackDistricts
+) {
+  let nearest = fallbacks[0];
+  let minDistance = calculateDistance(userLat, userLng, nearest.latitude, nearest.longitude);
+
+  for (const district of fallbacks) {
+    const distance = calculateDistance(userLat, userLng, district.latitude, district.longitude);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearest = district;
+    }
+  }
+
+  return { ...nearest, distance: minDistance };
+}
+
+async function getLocationName(latitude: number, longitude: number): Promise<string> {
+  try {
+    const response = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.city || data.locality || data.principalSubdivision || 'Unknown Location';
+    }
+  } catch (error) {
+    console.error('Reverse geocoding failed:', error);
+  }
+  
+  return `Location (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -32,98 +87,108 @@ export default async function handler(
       });
     }
 
-    // Get all districts
-    const districts = await prisma.district.findMany({
+    // Get all districts from database
+    const allDistricts = await prisma.district.findMany({
       select: {
         id: true,
         code: true,
         name: true,
-        nameHindi: true,
-        latitude: true,
-        longitude: true,
         stateCode: true,
         stateName: true,
-        population: true,
+        latitude: true,
+        longitude: true,
       },
     });
 
-    if (districts.length === 0) {
-      return res.status(404).json({
+    if (allDistricts.length === 0) {
+      return res.status(500).json({
         success: false,
-        error: 'No districts found',
+        error: 'No districts found in database',
       });
     }
 
     // Find nearest district
-    const nearest = findNearestDistrict(latitude, longitude, districts);
+    let nearestDistrict = allDistricts[0];
+    let minDistance = calculateDistance(
+      latitude,
+      longitude,
+      nearestDistrict.latitude,
+      nearestDistrict.longitude
+    );
 
-    if (!nearest) {
-      return res.status(404).json({
-        success: false,
-        error: 'Could not find nearest district',
-      });
+    for (const district of allDistricts) {
+      const distance = calculateDistance(
+        latitude,
+        longitude,
+        district.latitude,
+        district.longitude
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestDistrict = district;
+      }
     }
 
-      // Log user activity (optional)
-      try {
-        await prisma.userActivity.create({
-          data: {
-            action: 'geolocation',
-            districtId: nearest.id,
-            metadata: JSON.stringify({
-              latitude,
-              longitude,
-              distance: nearest.distance,
-            }),
-            ipAddress: req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress,
-            userAgent: req.headers['user-agent'],
-          },
-        });
-      } catch (err) {
-        // Don't fail the request if logging fails
-        console.error('Failed to log user activity:', err);
-      }    return res.status(200).json({
-      success: true,
-      data: {
-        district: {
-          id: nearest.id,
-          code: nearest.code,
-          name: nearest.name,
-          nameHindi: nearest.nameHindi || undefined,
-          stateCode: (nearest as any).stateCode,
-          stateName: (nearest as any).stateName,
-          latitude: nearest.latitude,
-          longitude: nearest.longitude,
-          population: (nearest as any).population || undefined,
-        },
-        distance: nearest.distance || 0,
-      },
-    } as any);
-  } catch (error) {
-    console.error('Error detecting district:', error);
-    console.error('Database URL:', process.env.DATABASE_URL?.substring(0, 20) + '...');
-    
-    // Fallback: return a default district near Delhi
-    const fallbackDistrict = {
-      id: 'fallback-default',
-      code: 'UP001',
-      name: 'Agra',
-      nameHindi: 'आगरा',
-      stateCode: 'UP',
-      stateName: 'Uttar Pradesh',
-      latitude: 27.1767,
-      longitude: 78.0081,
-      population: 1746467,
+    // Convert to DistrictData format
+    const districtData: DistrictData = {
+      id: nearestDistrict.id,
+      code: nearestDistrict.code,
+      name: nearestDistrict.name,
+      stateCode: nearestDistrict.stateCode,
+      stateName: nearestDistrict.stateName,
+      latitude: nearestDistrict.latitude,
+      longitude: nearestDistrict.longitude,
     };
 
     return res.status(200).json({
       success: true,
       data: {
-        district: fallbackDistrict,
-        distance: 0,
+        district: districtData,
+        distance: minDistance,
       },
-      source: 'fallback',
-      note: 'Database not available, using fallback district'
-    } as any);
+    });
+
+  } catch (error) {
+    console.error('Error in detect-district:', error);
+
+    // Fallback to nearest major city if database query fails
+    const { latitude, longitude } = req.body || {};
+    
+    if (typeof latitude === 'number' && typeof longitude === 'number') {
+      try {
+        const nearest = findNearestFallbackDistrict(latitude, longitude, fallbackDistricts);
+        const locationName = await getLocationName(latitude, longitude);
+
+        // Create a fallback district data structure
+        const fallbackDistrictData: DistrictData = {
+          id: 'fallback',
+          code: 'FALLBACK',
+          name: nearest.name,
+          stateCode: 'FB',
+          stateName: nearest.stateName,
+          latitude: nearest.latitude,
+          longitude: nearest.longitude,
+        };
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            district: fallbackDistrictData,
+            distance: nearest.distance,
+          },
+          source: 'fallback',
+        });
+      } catch (fallbackError) {
+        console.error('Fallback location detection failed:', fallbackError);
+      }
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to detect location',
+    });
+  } finally {
+    await prisma.$disconnect();
   }
 }
