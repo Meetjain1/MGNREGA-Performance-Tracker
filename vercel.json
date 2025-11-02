@@ -1,5 +1,5 @@
 {
-  "buildCommand": "prisma generate || true && next build",
+  "buildCommand": "npm run vercel-build",
   "devCommand": "next dev",
   "installCommand": "npm install",
   "framework": "nextjs",
