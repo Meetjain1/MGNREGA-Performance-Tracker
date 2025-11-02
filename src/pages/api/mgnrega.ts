@@ -150,8 +150,8 @@ function parseAPIData(apiData: any, districtCode: string, districtName: string, 
   };
 
   return {
-    id: `api-${districtId}-${financialYear}-${month}`,
-    districtId,
+    id: `api-${districtCode}-${financialYear}-${month}`,
+    districtId: districtCode,
     financialYear,
     month,
     jobCardsIssued: parseBigInt(record.Total_No_of_JobCards_issued),
