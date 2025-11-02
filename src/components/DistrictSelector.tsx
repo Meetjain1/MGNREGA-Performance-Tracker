@@ -100,25 +100,19 @@ export default function DistrictSelector({ onSelect, selectedDistrict }: Distric
             // If district is nearby (within 50km), assume it's the user's district - auto-select silently
             // If far away (>50km), show alert that current location is not in database
             if (distance > 50) {
-              const hindiMessage = 
-                `आपका वर्तमान स्थान MGNREGA डेटाबेस में उपलब्ध नहीं है\n\n` +
-                `हम केवल इन राज्यों का डेटा दिखा सकते हैं:\n` +
-                `बिहार, महाराष्ट्र, राजस्थान, उत्तर प्रदेश, पश्चिम बंगाल\n\n` +
-                `निकटतम उपलब्ध MGNREGA जिला:\n` +
-                `जिला: ${district.nameHindi || district.name}\n` +
-                `राज्य: ${district.stateName}\n` +
-                `दूरी: ${distance.toFixed(1)} किमी`;
-
-              const englishMessage = 
+              const message = 
+                `आपका वर्तमान स्थान MGNREGA डेटाबेस में उपलब्ध नहीं है\n` +
                 `Your current location is not in MGNREGA database\n\n` +
+                `हम केवल इन राज्यों का डेटा दिखा सकते हैं:\n` +
                 `We can only show data for these states:\n` +
                 `Bihar, Maharashtra, Rajasthan, Uttar Pradesh, West Bengal\n\n` +
+                `निकटतम उपलब्ध MGNREGA जिला:\n` +
                 `Showing nearest available MGNREGA district:\n` +
                 `District: ${district.name}\n` +
                 `State: ${district.stateName}\n` +
                 `Distance: ${distance.toFixed(1)} km`;
               
-              alert(hindiMessage + `\n\n` + englishMessage);
+              alert(message);
             }
             // If within 50km, silently auto-select (user's actual location)
           } else {

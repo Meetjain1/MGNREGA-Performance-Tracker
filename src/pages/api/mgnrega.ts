@@ -72,18 +72,28 @@ async function fetchFromDataGovAPI(
       }
 
       const data = await response.json();
-      console.log(`✅ API Response - Status: ${data.status}, Records: ${data.records?.length || 0}`);
+      
+      // Log the full response structure for debugging
+      console.log(`📥 API Response:`, {
+        status: data.status,
+        hasRecords: !!data.records,
+        recordCount: data.records?.length || 0,
+        message: data.message,
+        keys: Object.keys(data).slice(0, 10)
+      });
 
       if (data.status === 'error' || !data.records || data.records.length === 0) {
         if (attempt < retries) {
           console.log(`⚠️ No records found, will retry...`);
           continue; // Try again
         }
-        throw new Error(`API returned no data: ${data.message || 'No records found'}`);
+        // More descriptive error message
+        const errorMsg = data.message || data.error || 'No records found';
+        throw new Error(`API returned no data: ${errorMsg}`);
       }
 
       // Success - return data
-      console.log(`✅ Successfully fetched API data`);
+      console.log(`✅ Successfully fetched ${data.records.length} records from API`);
       return data;
 
     } catch (error) {
@@ -327,8 +337,14 @@ export default async function handler(
     // Try to fetch from data.gov.in API
     console.log('Attempting to fetch from data.gov.in API for district:', districtId);
     try {
-      // We need district code for API, use fallback mapping if database unavailable
-      const districtCode = district?.code || districtId;
+      // We need district code for API
+      // If database is unavailable, we can't get the district code, so skip API call
+      if (!district || !district.code) {
+        console.log('⚠️ No district code available (database unavailable), skipping API call');
+        throw new Error('District code not available - database error');
+      }
+      
+      const districtCode = district.code;
       console.log('Using district code for API:', districtCode);
       
       const apiData = await fetchFromDataGovAPI(districtCode, financialYear, month);
