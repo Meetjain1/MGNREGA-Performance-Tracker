@@ -6,6 +6,9 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Note: For local development with SQLite, change provider to "sqlite" 
+  // and DATABASE_URL to "file:./dev.db"
+  // Production uses PostgreSQL automatically via Vercel environment variables
 }
 
 // District master data with geolocation
