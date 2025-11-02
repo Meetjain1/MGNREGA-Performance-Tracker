@@ -1,9 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { calculateDistance } from '@/lib/utils';
 import type { APIResponse, GeolocationResponse, DistrictData } from '@/types';
-
-const prisma = new PrismaClient();
 
 // Major cities as fallback districts
 const fallbackDistricts: Array<{
@@ -188,7 +186,5 @@ export default async function handler(
       success: false,
       error: 'Failed to detect location',
     });
-  } finally {
-    await prisma.$disconnect();
   }
 }
