@@ -146,8 +146,17 @@ export default function Home() {
                   {dataSource === 'fallback' && (
                     <div className="bg-yellow-100 border-2 border-yellow-400 px-4 py-2 rounded-lg">
                       <p className="text-sm font-medium">
-                        <span className="block">⚠️ पुराना डेटा</span>
-                        Showing cached data
+                        <span className="block">⚠️ सरकारी API उपलब्ध नहीं</span>
+                        <span className="block">Government API unavailable</span>
+                        <span className="block text-xs mt-1">Showing estimated data</span>
+                      </p>
+                    </div>
+                  )}
+                  {dataSource === 'api' && (
+                    <div className="bg-green-100 border-2 border-green-400 px-4 py-2 rounded-lg">
+                      <p className="text-sm font-medium">
+                        <span className="block">✅ लाइव सरकारी डेटा</span>
+                        <span className="block">Live Government Data</span>
                       </p>
                     </div>
                   )}

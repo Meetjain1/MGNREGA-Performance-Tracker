@@ -29,12 +29,13 @@ function checkRateLimit(ip: string): boolean {
 async function fetchFromDataGovAPI(
   districtCode: string,
   financialYear: string,
-  month: number
+  month: number,
+  retries: number = 2
 ): Promise<any> {
   const apiKey = process.env.MGNREGA_API_KEY || '';
   const baseUrl = 'https://api.data.gov.in/resource/ee03643a-ee4c-48c2-ac30-9f2ff26ab722';
   
-  console.log(`Fetching MGNREGA data for district ${districtCode}, FY ${financialYear}, month ${month}`);
+  console.log(`🔄 Fetching FRESH MGNREGA data for district ${districtCode}, FY ${financialYear}, month ${month}`);
   
   // Build URL with parameters
   const url = new URL(baseUrl);
@@ -48,58 +49,56 @@ async function fetchFromDataGovAPI(
   }
   url.searchParams.append('filters[fin_year]', financialYear);
 
-  console.log(`API URL: ${url.toString()}`);
+  console.log(`🌐 API URL: ${url.toString().substring(0, 100)}...`);
 
-  try {
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'MGNREGA-Performance-Tracker/1.0',
-      },
-      signal: AbortSignal.timeout(30000), // Increased timeout to 30 seconds
-    });
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`🔁 Retry attempt ${attempt}/${retries}...`);
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
 
-    if (!response.ok) {
-      throw new Error(`API returned ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log(`API Response status: ${data.status}, records: ${data.records?.length || 0}`);
-
-    if (data.status === 'error' || !data.records || data.records.length === 0) {
-      // Try without district filter
-      const urlWithoutDistrict = new URL(baseUrl);
-      urlWithoutDistrict.searchParams.append('api-key', apiKey);
-      urlWithoutDistrict.searchParams.append('format', 'json');
-      urlWithoutDistrict.searchParams.append('limit', '50');
-      urlWithoutDistrict.searchParams.append('filters[fin_year]', financialYear);
-      
-      console.log(`Trying without district filter: ${urlWithoutDistrict.toString()}`);
-      
-      const fallbackResponse = await fetch(urlWithoutDistrict.toString(), {
+      const response = await fetch(url.toString(), {
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'MGNREGA-Performance-Tracker/1.0',
         },
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(15000), // 15 second timeout per attempt
       });
 
-      if (fallbackResponse.ok) {
-        const fallbackData = await fallbackResponse.json();
-        if (fallbackData.records && fallbackData.records.length > 0) {
-          console.log(`Fallback API success: ${fallbackData.records.length} records`);
-          return fallbackData;
-        }
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}: ${response.statusText}`);
       }
-      
-      throw new Error(`API returned no data: ${data.message || 'No records found'}`);
-    }
 
-    return data;
-  } catch (error) {
-    console.error('API fetch failed:', error);
-    throw error;
+      const data = await response.json();
+      console.log(`✅ API Response - Status: ${data.status}, Records: ${data.records?.length || 0}`);
+
+      if (data.status === 'error' || !data.records || data.records.length === 0) {
+        if (attempt < retries) {
+          console.log(`⚠️ No records found, will retry...`);
+          continue; // Try again
+        }
+        throw new Error(`API returned no data: ${data.message || 'No records found'}`);
+      }
+
+      // Success - return data
+      console.log(`✅ Successfully fetched API data`);
+      return data;
+
+    } catch (error) {
+      console.error(`❌ API attempt ${attempt + 1} failed:`, error instanceof Error ? error.message : error);
+      
+      if (attempt >= retries) {
+        // All retries exhausted
+        throw error;
+      }
+      // Continue to next retry
+    }
   }
+
+  // If we get here, all retries failed
+  throw new Error('API connection failed after all retries');
 }
 
 function parseAPIData(apiData: any, districtId: string, financialYear: string, month: number): any {

@@ -100,15 +100,25 @@ export default function DistrictSelector({ onSelect, selectedDistrict }: Distric
             // If district is nearby (within 50km), assume it's the user's district - auto-select silently
             // If far away (>50km), show alert that current location is not in database
             if (distance > 50) {
-              const message = `आपका वर्तमान स्थान MGNREGA डेटाबेस में उपलब्ध नहीं है\n` +
-                `Your current location is not available in MGNREGA database\n\n` +
-                `निकटतम उपलब्ध MGNREGA केंद्र दिखा रहे हैं:\n` +
-                `Showing nearest available MGNREGA center:\n\n` +
-                `जिला / District: ${district.nameHindi} / ${district.name}\n` +
-                `राज्य / State: ${district.stateName || district.stateCode}\n` +
-                `दूरी / Distance: ${distance.toFixed(1)} km`;
+              const hindiMessage = 
+                `आपका वर्तमान स्थान MGNREGA डेटाबेस में उपलब्ध नहीं है\n\n` +
+                `हम केवल इन राज्यों का डेटा दिखा सकते हैं:\n` +
+                `बिहार, महाराष्ट्र, राजस्थान, उत्तर प्रदेश, पश्चिम बंगाल\n\n` +
+                `निकटतम उपलब्ध MGNREGA जिला:\n` +
+                `जिला: ${district.nameHindi || district.name}\n` +
+                `राज्य: ${district.stateName}\n` +
+                `दूरी: ${distance.toFixed(1)} किमी`;
+
+              const englishMessage = 
+                `Your current location is not in MGNREGA database\n\n` +
+                `We can only show data for these states:\n` +
+                `Bihar, Maharashtra, Rajasthan, Uttar Pradesh, West Bengal\n\n` +
+                `Showing nearest available MGNREGA district:\n` +
+                `District: ${district.name}\n` +
+                `State: ${district.stateName}\n` +
+                `Distance: ${distance.toFixed(1)} km`;
               
-              alert(message);
+              alert(hindiMessage + `\n\n` + englishMessage);
             }
             // If within 50km, silently auto-select (user's actual location)
           } else {
